@@ -1,0 +1,750 @@
+<!doctype html>
+<html lang="id">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logic Trainer</title>
+  <script src="/_sdk/data_sdk.js"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      box-sizing: border-box;
+    }
+    
+    .problem-card {
+      transition: all 0.3s ease;
+    }
+    
+    .problem-card:hover {
+      transform: translateY(-2px);
+    }
+    
+    .correct-answer {
+      animation: pulse-green 0.5s ease;
+    }
+    
+    .incorrect-answer {
+      animation: shake 0.5s ease;
+    }
+    
+    @keyframes pulse-green {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-10px); }
+      75% { transform: translateX(10px); }
+    }
+    
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 16px 24px;
+      border-radius: 8px;
+      font-weight: 600;
+      z-index: 1000;
+      animation: slideIn 0.3s ease;
+    }
+    
+    @keyframes slideIn {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+  </style>
+  <style>@view-transition { navigation: auto; }</style>
+ </head>
+ <body>
+  <div id="app" class="w-full min-h-full"></div>
+  <script>
+    const defaultConfig = {
+      background_color: "#f0f4f8",
+      surface_color: "#ffffff",
+      text_color: "#1a202c",
+      primary_action_color: "#3b82f6",
+      secondary_action_color: "#64748b",
+      font_family: "sans-serif",
+      font_size: 16,
+      main_title: "Logic Trainer",
+      subtitle: "Latihan Logika & Reasoning",
+      instruction_text: "Pilih kategori soal dan jawab pertanyaan untuk melatih kemampuan logika Anda"
+    };
+
+    const categoryMaterials = {
+      "boolean-logic": {
+        title: "Logika Boolean",
+        analogy: "🚦 Bayangkan lampu lalu lintas dan aturan jalan:",
+        explanation: `
+          <strong>AND (DAN)</strong> - Seperti persimpangan: mobil bisa lewat HANYA jika lampu hijau DAN tidak ada pejalan kaki. Kedua syarat harus terpenuhi.
+          <br><br>
+          <strong>OR (ATAU)</strong> - Seperti pintu masuk gedung: kamu bisa masuk jika punya kartu akses ATAU diantar security. Salah satu syarat saja sudah cukup.
+          <br><br>
+          <strong>NOT (BUKAN)</strong> - Seperti kebalikan: jika lampu hijau adalah "boleh jalan", maka NOT hijau adalah "TIDAK boleh jalan".
+        `
+      },
+      "conditional": {
+        title: "Kondisional (Percabangan)",
+        analogy: "🚪 Bayangkan perjalanan dengan pilihan pintu:",
+        explanation: `
+          <strong>IF-ELSE</strong> - Seperti di persimpangan jalan: JIKA hujan, bawa payung, JIKA TIDAK, pakai topi. Program memilih jalur berbeda berdasarkan kondisi.
+          <br><br>
+          <strong>Nested IF</strong> - Seperti filter bertingkat: untuk masuk wahana, cek umur dulu (>12 tahun?), lalu cek tinggi (>120cm?). Setiap tahap punya syarat sendiri.
+          <br><br>
+          <strong>Comparison</strong> - Seperti membandingkan: apakah uang saku cukup untuk beli es krim? Program membandingkan nilai dan menghasilkan jawaban True/False.
+        `
+      },
+      "loop": {
+        title: "Perulangan (Loop)",
+        analogy: "🔄 Bayangkan aktivitas berulang sehari-hari:",
+        explanation: `
+          <strong>FOR Loop</strong> - Seperti mengerjakan 10 soal matematika: kamu tahu pasti akan mengerjakan 10 kali, dari soal 1 sampai 10.
+          <br><br>
+          <strong>WHILE Loop</strong> - Seperti mengupas bawang: kamu terus mengupas SELAMA masih ada kulit. Berhenti saat kondisi tidak terpenuhi (kulit habis).
+          <br><br>
+          <strong>Loop Counter</strong> - Seperti menabung: setiap hari tambahkan Rp 5.000, hitung total setelah 5 hari. Loop menjumlahkan nilai berulang kali.
+        `
+      },
+      "algorithm": {
+        title: "Algoritma Dasar",
+        analogy: "🎯 Bayangkan strategi memecahkan masalah:",
+        explanation: `
+          <strong>Searching</strong> - Seperti mencari buku di rak: lihat satu per satu dari kiri ke kanan sampai ketemu. Linear search memeriksa setiap elemen secara berurutan.
+          <br><br>
+          <strong>Sorting</strong> - Seperti menyusun kartu remi dari kecil ke besar: bandingkan dan tukar posisi sampai semua terurut rapi.
+          <br><br>
+          <strong>Finding Maximum</strong> - Seperti lomba lari: bandingkan waktu semua pelari, pelari dengan waktu terbaik adalah pemenang. Program membandingkan semua nilai untuk temukan yang terbesar.
+        `
+      }
+    };
+
+    const problems = {
+      "boolean-logic": [
+        {
+          id: "bool-1",
+          title: "Operasi AND",
+          question: "Jika A = True dan B = False, berapakah hasil dari A AND B?",
+          options: ["True", "False", "Error", "Null"],
+          correct: 1,
+          explanation: "AND butuh KEDUA kondisi True. Karena B = False, hasilnya False. Seperti: punya uang DAN toko buka, jika toko tutup (False), kamu tidak bisa belanja."
+        },
+        {
+          id: "bool-2",
+          title: "Operasi OR",
+          question: "Jika X = True dan Y = False, berapakah hasil dari X OR Y?",
+          options: ["True", "False", "Error", "Null"],
+          correct: 0,
+          explanation: "OR butuh MINIMAL SATU kondisi True. Karena X = True, hasilnya True. Seperti: bisa naik motor ATAU mobil, punya motor saja (True) sudah cukup."
+        },
+        {
+          id: "bool-3",
+          title: "Operasi NOT",
+          question: "Jika Z = True, berapakah hasil dari NOT Z?",
+          options: ["True", "False", "1", "0"],
+          correct: 1,
+          explanation: "NOT membalik nilai. True menjadi False, False menjadi True. Seperti saklar: lampu nyala (True) dibalik jadi mati (False)."
+        }
+      ],
+      "conditional": [
+        {
+          id: "cond-1",
+          title: "IF Statement",
+          question: "Jika umur = 15, apa output dari: if (umur >= 18) { print('Dewasa') } else { print('Anak') }",
+          options: ["Dewasa", "Anak", "15", "Error"],
+          correct: 1,
+          explanation: "Cek kondisi: umur 15 >= 18? SALAH. Maka masuk ke bagian ELSE dan print 'Anak'. Seperti: jika cukup umur boleh nyetir (False), maka naik kendaraan umum."
+        },
+        {
+          id: "cond-2",
+          title: "Nested IF",
+          question: "Jika nilai = 85, output: if (nilai >= 90) { 'A' } else if (nilai >= 80) { 'B' } else { 'C' }",
+          options: ["A", "B", "C", "Error"],
+          correct: 1,
+          explanation: "Cek bertingkat: nilai 85 >= 90? TIDAK. Lanjut: 85 >= 80? YA, maka 'B'. Seperti filter: platinum (>=90)? Tidak. Gold (>=80)? Ya!"
+        },
+        {
+          id: "cond-3",
+          title: "Comparison",
+          question: "Jika x = 10 dan y = 20, apakah x < y bernilai?",
+          options: ["True", "False", "10", "20"],
+          correct: 0,
+          explanation: "Bandingkan: 10 < 20? BENAR. Hasilnya True. Seperti membandingkan tinggi badan: 150cm < 170cm? Ya, benar!"
+        }
+      ],
+      "loop": [
+        {
+          id: "loop-1",
+          title: "For Loop",
+          question: "Berapa kali 'Hello' dicetak: for (i = 0; i < 3; i++) { print('Hello') }",
+          options: ["2 kali", "3 kali", "4 kali", "Tidak terbatas"],
+          correct: 1,
+          explanation: "Loop dari i=0 sampai i<3: i=0 (print 1), i=1 (print 2), i=2 (print 3), i=3 (berhenti karena 3<3 salah). Total 3 kali. Seperti 3 putaran lari."
+        },
+        {
+          id: "loop-2",
+          title: "While Loop",
+          question: "Nilai awal x = 5. Berapa nilai x setelah: while (x > 0) { x = x - 2 }",
+          options: ["-1", "0", "1", "5"],
+          correct: 0,
+          explanation: "x=5 (>0, kurangi): x=3 (>0, kurangi): x=1 (>0, kurangi): x=-1 (TIDAK >0, berhenti). Hasil akhir -1. Seperti mundur 2 langkah sampai lewat garis 0."
+        },
+        {
+          id: "loop-3",
+          title: "Loop Counter",
+          question: "Berapa hasil akhir sum: sum = 0; for (i = 1; i <= 5; i++) { sum = sum + i }",
+          options: ["10", "15", "20", "25"],
+          correct: 1,
+          explanation: "Jumlahkan 1+2+3+4+5: sum=0, +1=1, +2=3, +3=6, +4=10, +5=15. Seperti menabung Rp1000 hari 1, Rp2000 hari 2, dst sampai hari 5."
+        }
+      ],
+      "algorithm": [
+        {
+          id: "algo-1",
+          title: "Searching",
+          question: "Mencari angka 7 di [2,4,6,7,9]. Linear search akan melakukan berapa kali perbandingan?",
+          options: ["3 kali", "4 kali", "5 kali", "7 kali"],
+          correct: 1,
+          explanation: "Cek satu-satu: 2=7? Tidak (1), 4=7? Tidak (2), 6=7? Tidak (3), 7=7? Ya! (4). Total 4 perbandingan. Seperti cek loker satu per satu sampai ketemu barang."
+        },
+        {
+          id: "algo-2",
+          title: "Sorting",
+          question: "Array [3,1,2] diurutkan ascending. Hasilnya adalah?",
+          options: ["[1,2,3]", "[3,2,1]", "[2,1,3]", "[3,1,2]"],
+          correct: 0,
+          explanation: "Ascending = dari kecil ke besar. Urutkan: 1 paling kecil, lalu 2, lalu 3. Hasilnya [1,2,3]. Seperti antre dari yang paling pendek."
+        },
+        {
+          id: "algo-3",
+          title: "Maximum Value",
+          question: "Nilai terbesar dari array [15, 8, 23, 4, 16] adalah?",
+          options: ["15", "16", "23", "8"],
+          correct: 2,
+          explanation: "Bandingkan semua: 15 vs 8 (15 lebih besar), 15 vs 23 (23 lebih besar), 23 vs 4 (23 tetap), 23 vs 16 (23 tetap). Maksimum = 23."
+        }
+      ]
+    };
+
+    let currentRecordCount = 0;
+    let currentCategory = null;
+    let currentProblem = null;
+    let studentName = "";
+
+    const dataHandler = {
+      onDataChanged(data) {
+        currentRecordCount = data.length;
+        renderHistorySection(data);
+      }
+    };
+
+    async function initApp() {
+      const initResult = await window.dataSdk.init(dataHandler);
+      if (!initResult.isOk) {
+        showToast("Gagal menginisialisasi aplikasi", "error");
+        return;
+      }
+
+      await window.elementSdk.init({
+        defaultConfig,
+        onConfigChange: async (config) => {
+          document.body.style.backgroundColor = config.background_color || defaultConfig.background_color;
+          
+          const appContainer = document.getElementById('app');
+          const baseFontStack = 'system-ui, -apple-system, sans-serif';
+          const customFont = config.font_family || defaultConfig.font_family;
+          const baseSize = config.font_size || defaultConfig.font_size;
+          
+          appContainer.style.fontFamily = `${customFont}, ${baseFontStack}`;
+          appContainer.style.color = config.text_color || defaultConfig.text_color;
+          
+          const mainTitle = document.getElementById('main-title');
+          if (mainTitle) {
+            mainTitle.textContent = config.main_title || defaultConfig.main_title;
+            mainTitle.style.fontSize = `${baseSize * 2}px`;
+          }
+          
+          const subtitle = document.getElementById('subtitle');
+          if (subtitle) {
+            subtitle.textContent = config.subtitle || defaultConfig.subtitle;
+            subtitle.style.fontSize = `${baseSize * 1.25}px`;
+          }
+          
+          const instruction = document.getElementById('instruction-text');
+          if (instruction) {
+            instruction.textContent = config.instruction_text || defaultConfig.instruction_text;
+            instruction.style.fontSize = `${baseSize}px`;
+          }
+          
+          const cards = document.querySelectorAll('.problem-card');
+          cards.forEach(card => {
+            card.style.backgroundColor = config.surface_color || defaultConfig.surface_color;
+          });
+          
+          const buttons = document.querySelectorAll('.primary-button');
+          buttons.forEach(btn => {
+            btn.style.backgroundColor = config.primary_action_color || defaultConfig.primary_action_color;
+          });
+          
+          const secondaryButtons = document.querySelectorAll('.secondary-button');
+          secondaryButtons.forEach(btn => {
+            btn.style.backgroundColor = config.secondary_action_color || defaultConfig.secondary_action_color;
+          });
+          
+          const allText = document.querySelectorAll('.base-text');
+          allText.forEach(el => {
+            el.style.fontSize = `${baseSize}px`;
+          });
+          
+          const labels = document.querySelectorAll('.label-text');
+          labels.forEach(el => {
+            el.style.fontSize = `${baseSize * 0.875}px`;
+          });
+        },
+        mapToCapabilities: (config) => ({
+          recolorables: [
+            {
+              get: () => config.background_color || defaultConfig.background_color,
+              set: (value) => {
+                config.background_color = value;
+                window.elementSdk.setConfig({ background_color: value });
+              }
+            },
+            {
+              get: () => config.surface_color || defaultConfig.surface_color,
+              set: (value) => {
+                config.surface_color = value;
+                window.elementSdk.setConfig({ surface_color: value });
+              }
+            },
+            {
+              get: () => config.text_color || defaultConfig.text_color,
+              set: (value) => {
+                config.text_color = value;
+                window.elementSdk.setConfig({ text_color: value });
+              }
+            },
+            {
+              get: () => config.primary_action_color || defaultConfig.primary_action_color,
+              set: (value) => {
+                config.primary_action_color = value;
+                window.elementSdk.setConfig({ primary_action_color: value });
+              }
+            },
+            {
+              get: () => config.secondary_action_color || defaultConfig.secondary_action_color,
+              set: (value) => {
+                config.secondary_action_color = value;
+                window.elementSdk.setConfig({ secondary_action_color: value });
+              }
+            }
+          ],
+          borderables: [],
+          fontEditable: {
+            get: () => config.font_family || defaultConfig.font_family,
+            set: (value) => {
+              config.font_family = value;
+              window.elementSdk.setConfig({ font_family: value });
+            }
+          },
+          fontSizeable: {
+            get: () => config.font_size || defaultConfig.font_size,
+            set: (value) => {
+              config.font_size = value;
+              window.elementSdk.setConfig({ font_size: value });
+            }
+          }
+        }),
+        mapToEditPanelValues: (config) => new Map([
+          ["main_title", config.main_title || defaultConfig.main_title],
+          ["subtitle", config.subtitle || defaultConfig.subtitle],
+          ["instruction_text", config.instruction_text || defaultConfig.instruction_text]
+        ])
+      });
+
+      renderApp();
+    }
+
+    function renderApp() {
+      const config = window.elementSdk ? window.elementSdk.config : defaultConfig;
+      const app = document.getElementById('app');
+      
+      app.innerHTML = `
+        <div class="w-full min-h-full p-8">
+          <header class="text-center mb-12">
+            <h1 id="main-title" class="font-bold mb-2" style="color: ${config.text_color || defaultConfig.text_color}">${config.main_title || defaultConfig.main_title}</h1>
+            <p id="subtitle" class="base-text" style="color: ${config.text_color || defaultConfig.text_color}">${config.subtitle || defaultConfig.subtitle}</p>
+          </header>
+
+          <div id="main-content" class="max-w-6xl mx-auto">
+            ${renderNameInputSection(config)}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderNameInputSection(config) {
+      return `
+        <div class="problem-card p-8 rounded-lg shadow-md mb-8" style="background-color: ${config.surface_color || defaultConfig.surface_color}">
+          <h2 class="text-xl font-semibold mb-4 base-text" style="color: ${config.text_color || defaultConfig.text_color}">Selamat Datang!</h2>
+          <p id="instruction-text" class="mb-6 base-text" style="color: ${config.text_color || defaultConfig.text_color}">${config.instruction_text || defaultConfig.instruction_text}</p>
+          
+          <div class="mb-4">
+            <label for="student-name-input" class="block mb-2 font-medium label-text" style="color: ${config.text_color || defaultConfig.text_color}">Nama Siswa:</label>
+            <input 
+              type="text" 
+              id="student-name-input" 
+              placeholder="Masukkan nama Anda"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg base-text"
+            >
+          </div>
+          
+          <button 
+            id="start-button" 
+            class="primary-button w-full py-3 text-white font-semibold rounded-lg base-text"
+            style="background-color: ${config.primary_action_color || defaultConfig.primary_action_color}"
+          >
+            Mulai Latihan
+          </button>
+        </div>
+      `;
+    }
+
+    function renderCategorySelection(config) {
+      return `
+        <div class="mb-8">
+          <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-bold" style="color: ${config.text_color || defaultConfig.text_color}">Halo, ${studentName}! Pilih Kategori</h2>
+            <button 
+              id="view-history-btn"
+              class="secondary-button px-6 py-2 text-white rounded-lg base-text"
+              style="background-color: ${config.secondary_action_color || defaultConfig.secondary_action_color}"
+            >
+              Lihat Riwayat
+            </button>
+          </div>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            ${renderCategoryCard("boolean-logic", "Logika Boolean", "Pelajari operasi AND, OR, NOT", config)}
+            ${renderCategoryCard("conditional", "Kondisional", "Latihan IF, ELSE, dan perbandingan", config)}
+            ${renderCategoryCard("loop", "Perulangan", "Pahami FOR, WHILE, dan iterasi", config)}
+            ${renderCategoryCard("algorithm", "Algoritma Dasar", "Sorting, searching, dan pemecahan masalah", config)}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderCategoryCard(id, title, description, config) {
+      return `
+        <div class="problem-card p-6 rounded-lg shadow-md" 
+             style="background-color: ${config.surface_color || defaultConfig.surface_color}">
+          <h3 class="text-xl font-semibold mb-2" style="color: ${config.text_color || defaultConfig.text_color}">${title}</h3>
+          <p class="base-text mb-4" style="color: ${config.text_color || defaultConfig.text_color}">${description}</p>
+          <div class="flex gap-2">
+            <button 
+              class="primary-button flex-1 px-4 py-2 text-white rounded-lg text-sm"
+              style="background-color: ${config.primary_action_color || defaultConfig.primary_action_color}"
+              onclick="showMaterial('${id}')"
+            >
+              📚 Materi
+            </button>
+            <button 
+              class="primary-button flex-1 px-4 py-2 text-white rounded-lg text-sm"
+              style="background-color: ${config.primary_action_color || defaultConfig.primary_action_color}"
+              onclick="selectCategory('${id}')"
+            >
+              Latihan →
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderProblemView(config) {
+      const problemList = problems[currentCategory];
+      const problem = problemList[currentProblem];
+      
+      return `
+        <div class="mb-8">
+          <button 
+            id="back-button"
+            class="secondary-button mb-6 px-6 py-2 text-white rounded-lg base-text"
+            style="background-color: ${config.secondary_action_color || defaultConfig.secondary_action_color}"
+          >
+            ← Kembali
+          </button>
+          
+          <div class="problem-card p-8 rounded-lg shadow-md" style="background-color: ${config.surface_color || defaultConfig.surface_color}">
+            <div class="mb-6">
+              <span class="label-text font-medium" style="color: ${config.text_color || defaultConfig.text_color}">Soal ${currentProblem + 1} dari ${problemList.length}</span>
+              <h2 class="text-2xl font-bold mt-2 mb-4" style="color: ${config.text_color || defaultConfig.text_color}">${problem.title}</h2>
+              <p class="text-lg base-text mb-6" style="color: ${config.text_color || defaultConfig.text_color}">${problem.question}</p>
+            </div>
+            
+            <div id="options-container" class="space-y-3 mb-6">
+              ${problem.options.map((option, index) => `
+                <button 
+                  class="option-button w-full p-4 text-left rounded-lg border-2 border-gray-300 base-text hover:border-blue-400 transition-all"
+                  onclick="checkAnswer(${index})"
+                  style="color: ${config.text_color || defaultConfig.text_color}"
+                >
+                  ${option}
+                </button>
+              `).join('')}
+            </div>
+            
+            <div id="feedback-area"></div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderHistorySection(data) {
+      const historyContainer = document.getElementById('history-container');
+      if (!historyContainer) return;
+      
+      const config = window.elementSdk ? window.elementSdk.config : defaultConfig;
+      
+      if (data.length === 0) {
+        historyContainer.innerHTML = `
+          <p class="text-center base-text" style="color: ${config.text_color || defaultConfig.text_color}">
+            Belum ada riwayat jawaban. Mulai latihan untuk melihat progres Anda!
+          </p>
+        `;
+        return;
+      }
+      
+      const grouped = data.reduce((acc, record) => {
+        if (!acc[record.student_name]) {
+          acc[record.student_name] = [];
+        }
+        acc[record.student_name].push(record);
+        return acc;
+      }, {});
+      
+      historyContainer.innerHTML = Object.entries(grouped).map(([name, records]) => {
+        const correct = records.filter(r => r.is_correct).length;
+        const total = records.length;
+        const percentage = Math.round((correct / total) * 100);
+        
+        return `
+          <div class="problem-card p-6 rounded-lg shadow-md mb-4" style="background-color: ${config.surface_color || defaultConfig.surface_color}">
+            <h3 class="text-xl font-semibold mb-3" style="color: ${config.text_color || defaultConfig.text_color}">${name}</h3>
+            <p class="base-text mb-2" style="color: ${config.text_color || defaultConfig.text_color}">
+              <strong>Benar:</strong> ${correct} dari ${total} (${percentage}%)
+            </p>
+            <div class="mt-3 space-y-2">
+              ${records.slice(-5).reverse().map(r => `
+                <div class="text-sm label-text p-2 rounded" style="background-color: ${r.is_correct ? '#d1fae5' : '#fee2e2'}; color: ${config.text_color || defaultConfig.text_color}">
+                  ${r.problem_title}: ${r.answer} ${r.is_correct ? '✓' : '✗'}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    document.addEventListener('click', (e) => {
+      if (e.target.id === 'start-button') {
+        const nameInput = document.getElementById('student-name-input');
+        if (nameInput.value.trim() === '') {
+          showToast("Mohon masukkan nama Anda", "error");
+          return;
+        }
+        studentName = nameInput.value.trim();
+        showCategorySelection();
+      }
+      
+      if (e.target.id === 'back-button') {
+        currentCategory = null;
+        currentProblem = null;
+        showCategorySelection();
+      }
+      
+      if (e.target.id === 'view-history-btn') {
+        showHistoryView();
+      }
+      
+      if (e.target.id === 'back-to-categories') {
+        showCategorySelection();
+      }
+      
+      if (e.target.id === 'next-problem') {
+        const problemList = problems[currentCategory];
+        if (currentProblem < problemList.length - 1) {
+          currentProblem++;
+          showProblem();
+        } else {
+          showToast("Selamat! Anda telah menyelesaikan semua soal di kategori ini", "success");
+          currentCategory = null;
+          currentProblem = null;
+          showCategorySelection();
+        }
+      }
+    });
+
+    function showCategorySelection() {
+      const config = window.elementSdk ? window.elementSdk.config : defaultConfig;
+      const mainContent = document.getElementById('main-content');
+      mainContent.innerHTML = renderCategorySelection(config);
+    }
+
+    function showMaterial(category) {
+      const config = window.elementSdk ? window.elementSdk.config : defaultConfig;
+      const mainContent = document.getElementById('main-content');
+      const material = categoryMaterials[category];
+      
+      mainContent.innerHTML = `
+        <div class="mb-8">
+          <button 
+            id="back-to-categories"
+            class="secondary-button mb-6 px-6 py-2 text-white rounded-lg base-text"
+            style="background-color: ${config.secondary_action_color || defaultConfig.secondary_action_color}"
+          >
+            ← Kembali
+          </button>
+          
+          <div class="problem-card p-8 rounded-lg shadow-md mb-6" style="background-color: ${config.surface_color || defaultConfig.surface_color}">
+            <h2 class="text-3xl font-bold mb-4" style="color: ${config.text_color || defaultConfig.text_color}">${material.title}</h2>
+            
+            <div class="mb-6 p-4 bg-blue-50 rounded-lg border-l-4 border-blue-500">
+              <p class="text-lg font-semibold mb-2" style="color: ${config.text_color || defaultConfig.text_color}">${material.analogy}</p>
+            </div>
+            
+            <div class="base-text leading-relaxed" style="color: ${config.text_color || defaultConfig.text_color}">
+              ${material.explanation}
+            </div>
+          </div>
+          
+          <button 
+            class="primary-button w-full py-4 text-white font-semibold rounded-lg text-lg"
+            style="background-color: ${config.primary_action_color || defaultConfig.primary_action_color}"
+            onclick="selectCategory('${category}')"
+          >
+            Mulai Latihan Soal →
+          </button>
+        </div>
+      `;
+    }
+
+    function selectCategory(category) {
+      currentCategory = category;
+      currentProblem = 0;
+      showProblem();
+    }
+
+    function showProblem() {
+      const config = window.elementSdk ? window.elementSdk.config : defaultConfig;
+      const mainContent = document.getElementById('main-content');
+      mainContent.innerHTML = renderProblemView(config);
+    }
+
+    async function checkAnswer(selectedIndex) {
+      if (currentRecordCount >= 999) {
+        showToast("Batas maksimum 999 jawaban telah tercapai. Silakan hapus beberapa riwayat terlebih dahulu.", "error");
+        return;
+      }
+      
+      const config = window.elementSdk ? window.elementSdk.config : defaultConfig;
+      const problemList = problems[currentCategory];
+      const problem = problemList[currentProblem];
+      const isCorrect = selectedIndex === problem.correct;
+      
+      const optionButtons = document.querySelectorAll('.option-button');
+      optionButtons.forEach((btn, index) => {
+        btn.disabled = true;
+        btn.style.cursor = 'not-allowed';
+        if (index === problem.correct) {
+          btn.style.borderColor = '#10b981';
+          btn.style.backgroundColor = '#d1fae5';
+        } else if (index === selectedIndex && !isCorrect) {
+          btn.style.borderColor = '#ef4444';
+          btn.style.backgroundColor = '#fee2e2';
+        }
+      });
+      
+      const feedbackArea = document.getElementById('feedback-area');
+      feedbackArea.innerHTML = `
+        <div class="p-4 rounded-lg mb-4 ${isCorrect ? 'correct-answer' : 'incorrect-answer'}" 
+             style="background-color: ${isCorrect ? '#d1fae5' : '#fee2e2'}">
+          <p class="font-semibold text-lg base-text" style="color: ${config.text_color || defaultConfig.text_color}">
+            ${isCorrect ? '✓ Benar!' : '✗ Kurang Tepat'}
+          </p>
+          <p class="mt-2 base-text" style="color: ${config.text_color || defaultConfig.text_color}">
+            ${isCorrect ? 'Jawaban Anda benar!' : `Jawaban yang benar adalah: ${problem.options[problem.correct]}`}
+          </p>
+        </div>
+        
+        <div class="p-4 rounded-lg mb-4 bg-blue-50 border-l-4 border-blue-500">
+          <p class="font-semibold mb-2 base-text" style="color: ${config.text_color || defaultConfig.text_color}">💡 Penjelasan:</p>
+          <p class="base-text" style="color: ${config.text_color || defaultConfig.text_color}">${problem.explanation}</p>
+        </div>
+        
+        <button 
+          id="next-problem"
+          class="primary-button w-full py-3 text-white font-semibold rounded-lg base-text"
+          style="background-color: ${config.primary_action_color || defaultConfig.primary_action_color}"
+        >
+          ${currentProblem < problemList.length - 1 ? 'Soal Berikutnya →' : 'Selesai'}
+        </button>
+      `;
+      
+      const result = await window.dataSdk.create({
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        student_name: studentName,
+        problem_type: currentCategory,
+        problem_title: problem.title,
+        answer: problem.options[selectedIndex],
+        is_correct: isCorrect,
+        timestamp: new Date().toISOString()
+      });
+      
+      if (!result.isOk) {
+        showToast("Gagal menyimpan jawaban", "error");
+      }
+    }
+
+    function showHistoryView() {
+      const config = window.elementSdk ? window.elementSdk.config : defaultConfig;
+      const mainContent = document.getElementById('main-content');
+      mainContent.innerHTML = `
+        <div class="mb-8">
+          <button 
+            id="back-to-categories"
+            class="secondary-button mb-6 px-6 py-2 text-white rounded-lg base-text"
+            style="background-color: ${config.secondary_action_color || defaultConfig.secondary_action_color}"
+          >
+            ← Kembali
+          </button>
+          
+          <h2 class="text-2xl font-bold mb-6" style="color: ${config.text_color || defaultConfig.text_color}">Riwayat Latihan</h2>
+          <div id="history-container"></div>
+        </div>
+      `;
+      
+      renderHistorySection(window.dataSdk ? Array.from({ length: currentRecordCount }) : []);
+    }
+
+    function showToast(message, type) {
+      const toast = document.createElement('div');
+      toast.className = `toast ${type === 'error' ? 'bg-red-500' : 'bg-green-500'} text-white`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.remove();
+      }, 3000);
+    }
+
+    initApp();
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9a4d8fb98519a8cf',t:'MTc2NDIwMzg5My4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
