@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Logic Trainer</title>
-  <script src="/_sdk/data_sdk.js"></script>
   <script src="/_sdk/element_sdk.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -38,30 +37,9 @@
       25% { transform: translateX(-10px); }
       75% { transform: translateX(10px); }
     }
-    
-    .toast {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      padding: 16px 24px;
-      border-radius: 8px;
-      font-weight: 600;
-      z-index: 1000;
-      animation: slideIn 0.3s ease;
-    }
-    
-    @keyframes slideIn {
-      from {
-        transform: translateX(400px);
-        opacity: 0;
-      }
-      to {
-        transform: translateX(0);
-        opacity: 1;
-      }
-    }
   </style>
   <style>@view-transition { navigation: auto; }</style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
  </head>
  <body>
   <div id="app" class="w-full min-h-full"></div>
@@ -233,25 +211,12 @@
       ]
     };
 
-    let currentRecordCount = 0;
     let currentCategory = null;
     let currentProblem = null;
-    let studentName = "";
-
-    const dataHandler = {
-      onDataChanged(data) {
-        currentRecordCount = data.length;
-        renderHistorySection(data);
-      }
-    };
+    let correctCount = 0;
+    let totalAnswered = 0;
 
     async function initApp() {
-      const initResult = await window.dataSdk.init(dataHandler);
-      if (!initResult.isOk) {
-        showToast("Gagal menginisialisasi aplikasi", "error");
-        return;
-      }
-
       await window.elementSdk.init({
         defaultConfig,
         onConfigChange: async (config) => {
@@ -384,51 +349,28 @@
           </header>
 
           <div id="main-content" class="max-w-6xl mx-auto">
-            ${renderNameInputSection(config)}
+            ${renderCategorySelection(config)}
           </div>
-        </div>
-      `;
-    }
-
-    function renderNameInputSection(config) {
-      return `
-        <div class="problem-card p-8 rounded-lg shadow-md mb-8" style="background-color: ${config.surface_color || defaultConfig.surface_color}">
-          <h2 class="text-xl font-semibold mb-4 base-text" style="color: ${config.text_color || defaultConfig.text_color}">Selamat Datang!</h2>
-          <p id="instruction-text" class="mb-6 base-text" style="color: ${config.text_color || defaultConfig.text_color}">${config.instruction_text || defaultConfig.instruction_text}</p>
-          
-          <div class="mb-4">
-            <label for="student-name-input" class="block mb-2 font-medium label-text" style="color: ${config.text_color || defaultConfig.text_color}">Nama Siswa:</label>
-            <input 
-              type="text" 
-              id="student-name-input" 
-              placeholder="Masukkan nama Anda"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg base-text"
-            >
-          </div>
-          
-          <button 
-            id="start-button" 
-            class="primary-button w-full py-3 text-white font-semibold rounded-lg base-text"
-            style="background-color: ${config.primary_action_color || defaultConfig.primary_action_color}"
-          >
-            Mulai Latihan
-          </button>
         </div>
       `;
     }
 
     function renderCategorySelection(config) {
+      const percentage = totalAnswered > 0 ? Math.round((correctCount / totalAnswered) * 100) : 0;
+      
       return `
         <div class="mb-8">
-          <div class="flex justify-between items-center mb-6">
-            <h2 class="text-2xl font-bold" style="color: ${config.text_color || defaultConfig.text_color}">Halo, ${studentName}! Pilih Kategori</h2>
-            <button 
-              id="view-history-btn"
-              class="secondary-button px-6 py-2 text-white rounded-lg base-text"
-              style="background-color: ${config.secondary_action_color || defaultConfig.secondary_action_color}"
-            >
-              Lihat Riwayat
-            </button>
+          ${totalAnswered > 0 ? `
+          <div class="problem-card p-6 rounded-lg shadow-md mb-6" style="background-color: ${config.surface_color || defaultConfig.surface_color}">
+            <h3 class="text-xl font-semibold mb-2" style="color: ${config.text_color || defaultConfig.text_color}">📊 Statistik Anda</h3>
+            <p class="base-text" style="color: ${config.text_color || defaultConfig.text_color}">
+              <strong>Benar:</strong> ${correctCount} dari ${totalAnswered} soal (${percentage}%)
+            </p>
+          </div>
+          ` : ''}
+          
+          <div class="problem-card p-6 rounded-lg shadow-md mb-6" style="background-color: ${config.surface_color || defaultConfig.surface_color}">
+            <p id="instruction-text" class="base-text text-center" style="color: ${config.text_color || defaultConfig.text_color}">${config.instruction_text || defaultConfig.instruction_text}</p>
           </div>
           
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -506,74 +448,10 @@
       `;
     }
 
-    function renderHistorySection(data) {
-      const historyContainer = document.getElementById('history-container');
-      if (!historyContainer) return;
-      
-      const config = window.elementSdk ? window.elementSdk.config : defaultConfig;
-      
-      if (data.length === 0) {
-        historyContainer.innerHTML = `
-          <p class="text-center base-text" style="color: ${config.text_color || defaultConfig.text_color}">
-            Belum ada riwayat jawaban. Mulai latihan untuk melihat progres Anda!
-          </p>
-        `;
-        return;
-      }
-      
-      const grouped = data.reduce((acc, record) => {
-        if (!acc[record.student_name]) {
-          acc[record.student_name] = [];
-        }
-        acc[record.student_name].push(record);
-        return acc;
-      }, {});
-      
-      historyContainer.innerHTML = Object.entries(grouped).map(([name, records]) => {
-        const correct = records.filter(r => r.is_correct).length;
-        const total = records.length;
-        const percentage = Math.round((correct / total) * 100);
-        
-        return `
-          <div class="problem-card p-6 rounded-lg shadow-md mb-4" style="background-color: ${config.surface_color || defaultConfig.surface_color}">
-            <h3 class="text-xl font-semibold mb-3" style="color: ${config.text_color || defaultConfig.text_color}">${name}</h3>
-            <p class="base-text mb-2" style="color: ${config.text_color || defaultConfig.text_color}">
-              <strong>Benar:</strong> ${correct} dari ${total} (${percentage}%)
-            </p>
-            <div class="mt-3 space-y-2">
-              ${records.slice(-5).reverse().map(r => `
-                <div class="text-sm label-text p-2 rounded" style="background-color: ${r.is_correct ? '#d1fae5' : '#fee2e2'}; color: ${config.text_color || defaultConfig.text_color}">
-                  ${r.problem_title}: ${r.answer} ${r.is_correct ? '✓' : '✗'}
-                </div>
-              `).join('')}
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-
     document.addEventListener('click', (e) => {
-      if (e.target.id === 'start-button') {
-        const nameInput = document.getElementById('student-name-input');
-        if (nameInput.value.trim() === '') {
-          showToast("Mohon masukkan nama Anda", "error");
-          return;
-        }
-        studentName = nameInput.value.trim();
-        showCategorySelection();
-      }
-      
-      if (e.target.id === 'back-button') {
+      if (e.target.id === 'back-button' || e.target.id === 'back-to-categories') {
         currentCategory = null;
         currentProblem = null;
-        showCategorySelection();
-      }
-      
-      if (e.target.id === 'view-history-btn') {
-        showHistoryView();
-      }
-      
-      if (e.target.id === 'back-to-categories') {
         showCategorySelection();
       }
       
@@ -583,7 +461,6 @@
           currentProblem++;
           showProblem();
         } else {
-          showToast("Selamat! Anda telah menyelesaikan semua soal di kategori ini", "success");
           currentCategory = null;
           currentProblem = null;
           showCategorySelection();
@@ -647,16 +524,16 @@
       mainContent.innerHTML = renderProblemView(config);
     }
 
-    async function checkAnswer(selectedIndex) {
-      if (currentRecordCount >= 999) {
-        showToast("Batas maksimum 999 jawaban telah tercapai. Silakan hapus beberapa riwayat terlebih dahulu.", "error");
-        return;
-      }
-      
+    function checkAnswer(selectedIndex) {
       const config = window.elementSdk ? window.elementSdk.config : defaultConfig;
       const problemList = problems[currentCategory];
       const problem = problemList[currentProblem];
       const isCorrect = selectedIndex === problem.correct;
+      
+      if (isCorrect) {
+        correctCount++;
+      }
+      totalAnswered++;
       
       const optionButtons = document.querySelectorAll('.option-button');
       optionButtons.forEach((btn, index) => {
@@ -696,55 +573,9 @@
           ${currentProblem < problemList.length - 1 ? 'Soal Berikutnya →' : 'Selesai'}
         </button>
       `;
-      
-      const result = await window.dataSdk.create({
-        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        student_name: studentName,
-        problem_type: currentCategory,
-        problem_title: problem.title,
-        answer: problem.options[selectedIndex],
-        is_correct: isCorrect,
-        timestamp: new Date().toISOString()
-      });
-      
-      if (!result.isOk) {
-        showToast("Gagal menyimpan jawaban", "error");
-      }
-    }
-
-    function showHistoryView() {
-      const config = window.elementSdk ? window.elementSdk.config : defaultConfig;
-      const mainContent = document.getElementById('main-content');
-      mainContent.innerHTML = `
-        <div class="mb-8">
-          <button 
-            id="back-to-categories"
-            class="secondary-button mb-6 px-6 py-2 text-white rounded-lg base-text"
-            style="background-color: ${config.secondary_action_color || defaultConfig.secondary_action_color}"
-          >
-            ← Kembali
-          </button>
-          
-          <h2 class="text-2xl font-bold mb-6" style="color: ${config.text_color || defaultConfig.text_color}">Riwayat Latihan</h2>
-          <div id="history-container"></div>
-        </div>
-      `;
-      
-      renderHistorySection(window.dataSdk ? Array.from({ length: currentRecordCount }) : []);
-    }
-
-    function showToast(message, type) {
-      const toast = document.createElement('div');
-      toast.className = `toast ${type === 'error' ? 'bg-red-500' : 'bg-green-500'} text-white`;
-      toast.textContent = message;
-      document.body.appendChild(toast);
-      
-      setTimeout(() => {
-        toast.remove();
-      }, 3000);
     }
 
     initApp();
   </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9a4d8fb98519a8cf',t:'MTc2NDIwMzg5My4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9a4da316e53040f4',t:'MTc2NDIwNDY4Ni4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
